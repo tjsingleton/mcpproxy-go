@@ -1232,11 +1232,11 @@ func (c *Client) tryOAuthAuth(ctx context.Context) error {
 	if hasRefreshToken {
 		backoff := refreshConfig.InitialBackoff
 		for attempt := 1; attempt <= refreshConfig.MaxAttempts; attempt++ {
-			oauth.LogTokenRefreshAttempt(c.logger, attempt, refreshConfig.MaxAttempts)
+			oauth.LogClientConnectionAttempt(c.logger, attempt, refreshConfig.MaxAttempts)
 
 			err = c.client.Start(ctx)
 			if err == nil {
-				oauth.LogTokenRefreshSuccess(c.logger, time.Duration(attempt)*backoff)
+				oauth.LogClientConnectionSuccess(c.logger, time.Duration(attempt)*backoff)
 				lastErr = nil
 				break
 			}
@@ -1250,7 +1250,7 @@ func (c *Client) tryOAuthAuth(ctx context.Context) error {
 				return oauthErr
 			}
 
-			oauth.LogTokenRefreshFailure(c.logger, attempt, err)
+			oauth.LogClientConnectionFailure(c.logger, attempt, err)
 			lastErr = err
 
 			// Don't sleep on the last attempt
@@ -1288,7 +1288,7 @@ func (c *Client) tryOAuthAuth(ctx context.Context) error {
 				return fmt.Errorf("OAuth token exists in storage, retry connection to use it: %w", lastErr)
 			}
 
-			c.logger.Info("🎯 OAuth authorization required after refresh attempts - starting manual OAuth flow",
+			c.logger.Info("🎯 OAuth authorization required after connection attempts - starting manual OAuth flow",
 				zap.String("server", c.config.Name),
 				zap.Bool("had_refresh_token", hasRefreshToken))
 
@@ -1689,11 +1689,11 @@ func (c *Client) trySSEOAuthAuth(ctx context.Context) error {
 	if hasRefreshToken {
 		backoff := refreshConfig.InitialBackoff
 		for attempt := 1; attempt <= refreshConfig.MaxAttempts; attempt++ {
-			oauth.LogTokenRefreshAttempt(c.logger, attempt, refreshConfig.MaxAttempts)
+			oauth.LogClientConnectionAttempt(c.logger, attempt, refreshConfig.MaxAttempts)
 
 			err = c.client.Start(persistentCtx)
 			if err == nil {
-				oauth.LogTokenRefreshSuccess(c.logger, time.Duration(attempt)*backoff)
+				oauth.LogClientConnectionSuccess(c.logger, time.Duration(attempt)*backoff)
 				lastErr = nil
 				break
 			}
@@ -1707,7 +1707,7 @@ func (c *Client) trySSEOAuthAuth(ctx context.Context) error {
 				return oauthErr
 			}
 
-			oauth.LogTokenRefreshFailure(c.logger, attempt, err)
+			oauth.LogClientConnectionFailure(c.logger, attempt, err)
 			lastErr = err
 
 			// Don't sleep on the last attempt
@@ -1745,7 +1745,7 @@ func (c *Client) trySSEOAuthAuth(ctx context.Context) error {
 				return fmt.Errorf("OAuth token exists in storage, retry connection to use it: %w", lastErr)
 			}
 
-			c.logger.Info("🎯 SSE OAuth authorization required after refresh attempts - starting manual OAuth flow",
+			c.logger.Info("🎯 SSE OAuth authorization required after connection attempts - starting manual OAuth flow",
 				zap.String("server", c.config.Name),
 				zap.Bool("had_refresh_token", hasRefreshToken))
 
