@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"mcpproxy-go/internal/jsruntime"
-	"mcpproxy-go/internal/storage"
-	"mcpproxy-go/internal/upstream"
+	"github.com/smart-mcp-proxy/mcpproxy-go/internal/jsruntime"
+	"github.com/smart-mcp-proxy/mcpproxy-go/internal/storage"
+	"github.com/smart-mcp-proxy/mcpproxy-go/internal/upstream"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	mcpserver "github.com/mark3labs/mcp-go/server"
@@ -295,6 +295,22 @@ func (p *MCPProxyServer) handleCodeExecution(ctx context.Context, request mcp.Ca
 	if err != nil {
 		return nil, fmt.Errorf("failed to serialize result: %w", err)
 	}
+
+	// Spec 024: Emit internal tool call event for code_execution
+	var status, errorMsg string
+	if result.Ok {
+		status = "success"
+	} else {
+		status = "error"
+		if result.Error != nil {
+			errorMsg = result.Error.Message
+		}
+	}
+	codeExecArgs := map[string]interface{}{
+		"code":  code,
+		"input": options.Input,
+	}
+	p.emitActivityInternalToolCall("code_execution", "", "", "", sessionID, parentCallID, status, errorMsg, executionDuration.Milliseconds(), codeExecArgs, result, nil)
 
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{

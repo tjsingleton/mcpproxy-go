@@ -18,19 +18,20 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 	"go.uber.org/zap"
 
-	"mcpproxy-go/internal/config"
-	"mcpproxy-go/internal/contracts"
-	"mcpproxy-go/internal/health"
-	"mcpproxy-go/internal/httpapi"
-	"mcpproxy-go/internal/logs"
-	"mcpproxy-go/internal/management"
-	"mcpproxy-go/internal/runtime"
-	"mcpproxy-go/internal/secret"
-	"mcpproxy-go/internal/storage"
-	"mcpproxy-go/internal/tlslocal"
-	"mcpproxy-go/internal/updatecheck"
-	"mcpproxy-go/internal/upstream/types"
-	"mcpproxy-go/web"
+	"github.com/smart-mcp-proxy/mcpproxy-go/internal/config"
+	"github.com/smart-mcp-proxy/mcpproxy-go/internal/contracts"
+	"github.com/smart-mcp-proxy/mcpproxy-go/internal/health"
+	"github.com/smart-mcp-proxy/mcpproxy-go/internal/httpapi"
+	"github.com/smart-mcp-proxy/mcpproxy-go/internal/logs"
+	"github.com/smart-mcp-proxy/mcpproxy-go/internal/management"
+	"github.com/smart-mcp-proxy/mcpproxy-go/internal/observability"
+	"github.com/smart-mcp-proxy/mcpproxy-go/internal/runtime"
+	"github.com/smart-mcp-proxy/mcpproxy-go/internal/secret"
+	"github.com/smart-mcp-proxy/mcpproxy-go/internal/storage"
+	"github.com/smart-mcp-proxy/mcpproxy-go/internal/tlslocal"
+	"github.com/smart-mcp-proxy/mcpproxy-go/internal/updatecheck"
+	"github.com/smart-mcp-proxy/mcpproxy-go/internal/upstream/types"
+	"github.com/smart-mcp-proxy/mcpproxy-go/web"
 )
 
 // Status represents the current status of the server
@@ -61,6 +62,13 @@ type Server struct {
 
 	statusCh chan interface{}
 	eventsCh chan runtime.Event
+
+	// Spec 024: Track server start time for lifecycle events
+	startTime time.Time
+
+	// Spec 024: Shutdown info for lifecycle events
+	shutdownReason string
+	shutdownSignal string
 }
 
 // NewServer creates a new server instance
@@ -78,6 +86,17 @@ func NewServerWithConfigPath(cfg *config.Config, configPath string, logger *zap.
 	// Initialize update checker with build version
 	// This must happen before StartBackgroundInitialization is called
 	rt.SetVersion(httpapi.GetBuildVersion())
+
+	// Initialize observability manager for metrics (FR-011: OAuth refresh metrics)
+	obsConfig := observability.DefaultConfig("mcpproxy", httpapi.GetBuildVersion())
+	obsManager, err := observability.NewManager(logger.Sugar(), &obsConfig)
+	if err != nil {
+		logger.Warn("Failed to create observability manager, metrics will be disabled", zap.Error(err))
+	} else if obsManager.Metrics() != nil {
+		// Wire up metrics recorder to RefreshManager for OAuth refresh metrics
+		rt.SetRefreshMetricsRecorder(obsManager.Metrics())
+		logger.Info("OAuth refresh metrics enabled")
+	}
 
 	// Initialize management service and set it on runtime
 	secretResolver := secret.NewResolver()
@@ -221,6 +240,11 @@ func (s *Server) forwardRuntimeStatus() {
 
 // Start starts the MCP proxy server
 func (s *Server) Start(ctx context.Context) error {
+	// Spec 024: Track server start time for lifecycle events
+	s.mu.Lock()
+	s.startTime = time.Now()
+	s.mu.Unlock()
+
 	s.logger.Info("Starting MCP proxy server")
 
 	// Handle graceful shutdown when context is cancelled (for full application shutdown only)
@@ -286,6 +310,19 @@ func (s *Server) Start(ctx context.Context) error {
 		s.updateStatus(runtime.PhaseRunning, "Server is running in stdio mode")
 		s.runtime.SetRunning(true)
 
+		// Spec 024: Emit system_start activity event for stdio mode
+		startupDurationMs := time.Since(s.startTime).Milliseconds()
+		configPath := ""
+		if s.runtime != nil {
+			configPath = s.runtime.ConfigPath()
+		}
+		s.runtime.EmitActivitySystemStart(
+			httpapi.GetBuildVersion(),
+			"stdio",
+			startupDurationMs,
+			configPath,
+		)
+
 		// Serve using stdio (standard MCP transport)
 		if err := server.ServeStdio(s.mcpProxy.GetMCPServer()); err != nil {
 			return fmt.Errorf("MCP server error: %w", err)
@@ -296,6 +333,16 @@ func (s *Server) Start(ctx context.Context) error {
 }
 
 // discoverAndIndexTools discovers tools from upstream servers and indexes them
+
+// SetShutdownInfo sets the reason and signal for shutdown (Spec 024).
+// Call this before Shutdown() to include shutdown context in activity logs.
+func (s *Server) SetShutdownInfo(reason, signal string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.shutdownReason = reason
+	s.shutdownSignal = signal
+}
+
 // Shutdown gracefully shuts down the server
 func (s *Server) Shutdown() error {
 	s.mu.Lock()
@@ -306,7 +353,19 @@ func (s *Server) Shutdown() error {
 	}
 	s.shutdown = true
 	httpServer := s.httpServer
+	startTime := s.startTime
+	reason := s.shutdownReason
+	signal := s.shutdownSignal
 	s.mu.Unlock()
+
+	// Spec 024: Emit system_stop event before actual shutdown begins
+	if s.runtime != nil && !startTime.IsZero() {
+		uptimeSeconds := int64(time.Since(startTime).Seconds())
+		if reason == "" {
+			reason = "shutdown"
+		}
+		s.runtime.EmitActivitySystemStop(reason, signal, uptimeSeconds, "")
+	}
 
 	if s.eventsCh != nil {
 		s.runtime.UnsubscribeEvents(s.eventsCh)
@@ -616,6 +675,16 @@ func (s *Server) GetAllServers() ([]map[string]interface{}, error) {
 		// Check if OAuth is required for this server
 		if serverStatus.Config != nil && serverStatus.Config.OAuth != nil {
 			healthInput.OAuthRequired = true
+		}
+
+		// T032: Wire refresh state into health calculation (Spec 023)
+		if refreshMgr := s.runtime.RefreshManager(); refreshMgr != nil {
+			if refreshState := refreshMgr.GetRefreshState(serverStatus.Name); refreshState != nil {
+				healthInput.RefreshState = health.RefreshState(refreshState.State)
+				healthInput.RefreshRetryCount = refreshState.RetryCount
+				healthInput.RefreshLastError = refreshState.LastError
+				healthInput.RefreshNextAttempt = refreshState.NextAttempt
+			}
 		}
 
 		healthStatus := health.CalculateHealth(healthInput, health.DefaultHealthConfig())
@@ -1359,6 +1428,19 @@ func (s *Server) startCustomHTTPServer(ctx context.Context, streamableServer *se
 
 	// Broadcast running status with resolved listen address so readiness checks succeed immediately.
 	s.updateStatus(runtime.PhaseRunning, fmt.Sprintf("Server is running on %s", displayAddr))
+
+	// Spec 024: Emit system_start activity event
+	startupDurationMs := time.Since(s.startTime).Milliseconds()
+	configPath := ""
+	if s.runtime != nil {
+		configPath = s.runtime.ConfigPath()
+	}
+	s.runtime.EmitActivitySystemStart(
+		httpapi.GetBuildVersion(),
+		displayAddr,
+		startupDurationMs,
+		configPath,
+	)
 
 	// List all registered endpoints for visibility
 	allEndpoints := []string{

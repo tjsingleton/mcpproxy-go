@@ -9,7 +9,8 @@ import (
 
 	"go.uber.org/zap"
 
-	"mcpproxy-go/internal/storage"
+	"github.com/smart-mcp-proxy/mcpproxy-go/internal/storage"
+	"github.com/smart-mcp-proxy/mcpproxy-go/internal/stringutil"
 )
 
 // Default refresh configuration
@@ -31,6 +32,11 @@ const (
 
 	// MaxRetryBackoff is the maximum backoff duration (5 minutes per FR-009).
 	MaxRetryBackoff = 5 * time.Minute
+
+	// MaxExpiredTokenAge is how long after token expiration we continue retrying
+	// before giving up completely. After this duration, we assume the refresh token
+	// is no longer valid even if it wasn't explicitly rejected.
+	MaxExpiredTokenAge = 24 * time.Hour
 )
 
 // RefreshState represents the current state of token refresh for health reporting.
@@ -94,6 +100,16 @@ type RefreshEventEmitter interface {
 	EmitOAuthRefreshFailed(serverName string, errorMsg string)
 }
 
+// RefreshMetricsRecorder defines metrics recording methods for OAuth refresh operations.
+// This interface decouples RefreshManager from the concrete MetricsManager.
+type RefreshMetricsRecorder interface {
+	// RecordOAuthRefresh records an OAuth token refresh attempt.
+	// Result should be one of: "success", "failed_network", "failed_invalid_grant", "failed_other".
+	RecordOAuthRefresh(server, result string)
+	// RecordOAuthRefreshDuration records the duration of an OAuth token refresh attempt.
+	RecordOAuthRefreshDuration(server, result string, duration time.Duration)
+}
+
 // RefreshManagerConfig holds configuration for the RefreshManager.
 type RefreshManagerConfig struct {
 	Threshold  float64 // Percentage of lifetime at which to refresh (default: 0.8)
@@ -102,18 +118,19 @@ type RefreshManagerConfig struct {
 
 // RefreshManager coordinates proactive OAuth token refresh across all servers.
 type RefreshManager struct {
-	storage      RefreshTokenStore
-	coordinator  *OAuthFlowCoordinator
-	runtime      RefreshRuntimeOperations
-	eventEmitter RefreshEventEmitter
-	schedules    map[string]*RefreshSchedule
-	threshold    float64
-	maxRetries   int
-	mu           sync.RWMutex
-	logger       *zap.Logger
-	ctx          context.Context
-	cancel       context.CancelFunc
-	started      bool
+	storage         RefreshTokenStore
+	coordinator     *OAuthFlowCoordinator
+	runtime         RefreshRuntimeOperations
+	eventEmitter    RefreshEventEmitter
+	metricsRecorder RefreshMetricsRecorder
+	schedules       map[string]*RefreshSchedule
+	threshold       float64
+	maxRetries      int
+	mu              sync.RWMutex
+	logger          *zap.Logger
+	ctx             context.Context
+	cancel          context.CancelFunc
+	started         bool
 }
 
 // NewRefreshManager creates a new RefreshManager instance.
@@ -158,6 +175,12 @@ func (m *RefreshManager) SetRuntime(runtime RefreshRuntimeOperations) {
 // SetEventEmitter sets the event emitter for SSE notifications.
 func (m *RefreshManager) SetEventEmitter(emitter RefreshEventEmitter) {
 	m.eventEmitter = emitter
+}
+
+// SetMetricsRecorder sets the metrics recorder for Prometheus metrics.
+// This enables FR-011: OAuth refresh metrics emission.
+func (m *RefreshManager) SetMetricsRecorder(recorder RefreshMetricsRecorder) {
+	m.metricsRecorder = recorder
 }
 
 // Start initializes the refresh manager and loads existing tokens.
@@ -322,6 +345,13 @@ func (m *RefreshManager) executeImmediateRefresh(serverName string) {
 
 	// Log the result
 	LogActualTokenRefreshResult(m.logger, serverName, refreshErr == nil, duration, refreshErr)
+
+	// Record metrics (T014: Emit metrics on refresh attempt)
+	if m.metricsRecorder != nil {
+		result := classifyRefreshError(refreshErr)
+		m.metricsRecorder.RecordOAuthRefresh(serverName, result)
+		m.metricsRecorder.RecordOAuthRefreshDuration(serverName, result, duration)
+	}
 
 	if refreshErr != nil {
 		m.handleRefreshFailure(serverName, refreshErr)
@@ -532,12 +562,21 @@ func (m *RefreshManager) executeRefresh(serverName string) {
 	m.logger.Info("Executing proactive token refresh",
 		zap.String("server", serverName))
 
-	// Attempt refresh
+	// Attempt refresh with timing for metrics (T022: Emit refresh duration metric)
+	startTime := time.Now()
 	var refreshErr error
 	if m.runtime != nil {
 		refreshErr = m.runtime.RefreshOAuthToken(serverName)
 	} else {
 		refreshErr = ErrRefreshFailed
+	}
+	duration := time.Since(startTime)
+
+	// Record metrics (T022: Emit refresh duration metric on each attempt)
+	if m.metricsRecorder != nil {
+		result := classifyRefreshError(refreshErr)
+		m.metricsRecorder.RecordOAuthRefresh(serverName, result)
+		m.metricsRecorder.RecordOAuthRefreshDuration(serverName, result, duration)
 	}
 
 	if refreshErr != nil {
@@ -623,9 +662,9 @@ func (m *RefreshManager) handleRefreshFailure(serverName string, err error) {
 	if !expiresAt.IsZero() && now.After(expiresAt) {
 		// Token has already expired - check if we should give up
 		// We'll keep trying as long as there's a chance the refresh token is still valid
-		// Only give up if we've been trying for a very long time (e.g., > 24 hours past expiration)
+		// Only give up if we've been trying for too long (MaxExpiredTokenAge)
 		timeSinceExpiry := now.Sub(expiresAt)
-		if timeSinceExpiry > 24*time.Hour {
+		if timeSinceExpiry > MaxExpiredTokenAge {
 			m.logger.Error("OAuth token refresh failed - token expired too long ago",
 				zap.String("server", serverName),
 				zap.Duration("expired_for", timeSinceExpiry),
@@ -666,7 +705,7 @@ func classifyRefreshError(err error) string {
 		"refresh token invalid",
 	}
 	for _, pattern := range permanentErrors {
-		if containsIgnoreCase(errStr, pattern) {
+		if stringutil.ContainsIgnoreCase(errStr, pattern) {
 			return "failed_invalid_grant"
 		}
 	}
@@ -683,37 +722,12 @@ func classifyRefreshError(err error) string {
 		"context deadline exceeded",
 	}
 	for _, pattern := range networkErrors {
-		if containsIgnoreCase(errStr, pattern) {
+		if stringutil.ContainsIgnoreCase(errStr, pattern) {
 			return "failed_network"
 		}
 	}
 
 	return "failed_other"
-}
-
-// containsIgnoreCase checks if s contains substr, ignoring case.
-func containsIgnoreCase(s, substr string) bool {
-	sLower := toLower(s)
-	substrLower := toLower(substr)
-	for i := 0; i <= len(sLower)-len(substrLower); i++ {
-		if sLower[i:i+len(substrLower)] == substrLower {
-			return true
-		}
-	}
-	return false
-}
-
-// toLower converts a string to lowercase (ASCII only).
-func toLower(s string) string {
-	b := make([]byte, len(s))
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		if c >= 'A' && c <= 'Z' {
-			c += 'a' - 'A'
-		}
-		b[i] = c
-	}
-	return string(b)
 }
 
 // calculateBackoff calculates the exponential backoff duration for a given retry count.

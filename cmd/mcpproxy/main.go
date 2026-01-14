@@ -30,6 +30,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -37,14 +38,14 @@ import (
 	bbolterrors "go.etcd.io/bbolt/errors"
 	"go.uber.org/zap"
 
-	clioutput "mcpproxy-go/internal/cli/output"
-	"mcpproxy-go/internal/config"
-	"mcpproxy-go/internal/experiments"
-	"mcpproxy-go/internal/logs"
-	"mcpproxy-go/internal/registries"
-	"mcpproxy-go/internal/server"
-	"mcpproxy-go/internal/storage"
-	_ "mcpproxy-go/oas" // Import generated swagger docs
+	clioutput "github.com/smart-mcp-proxy/mcpproxy-go/internal/cli/output"
+	"github.com/smart-mcp-proxy/mcpproxy-go/internal/config"
+	"github.com/smart-mcp-proxy/mcpproxy-go/internal/experiments"
+	"github.com/smart-mcp-proxy/mcpproxy-go/internal/logs"
+	"github.com/smart-mcp-proxy/mcpproxy-go/internal/registries"
+	"github.com/smart-mcp-proxy/mcpproxy-go/internal/server"
+	"github.com/smart-mcp-proxy/mcpproxy-go/internal/storage"
+	_ "github.com/smart-mcp-proxy/mcpproxy-go/oas" // Import generated swagger docs
 )
 
 var (
@@ -554,6 +555,10 @@ func runServer(cmd *cobra.Command, _ []string) error {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
+	// Spec 024: Track received signal for activity logging
+	var receivedSignal atomic.Value
+	receivedSignal.Store("")
+
 	// Setup signal handling for graceful shutdown with force quit on second signal
 	logger.Info("Signal handler goroutine starting - waiting for SIGINT or SIGTERM")
 	_ = logger.Sync()
@@ -561,6 +566,7 @@ func runServer(cmd *cobra.Command, _ []string) error {
 		logger.Info("Signal handler goroutine is running, waiting for signal on channel")
 		_ = logger.Sync()
 		sig := <-sigChan
+		receivedSignal.Store(sig.String()) // Spec 024: Store signal for activity logging
 		logger.Info("Received signal, shutting down", zap.String("signal", sig.String()))
 		_ = logger.Sync() // Flush logs immediately so we can see shutdown messages
 		logger.Info("Press Ctrl+C again within 10 seconds to force quit")
@@ -592,6 +598,8 @@ func runServer(cmd *cobra.Command, _ []string) error {
 	// Wait for context to be cancelled
 	<-ctx.Done()
 	logger.Info("Shutting down server")
+	// Spec 024: Set shutdown info for activity logging
+	srv.SetShutdownInfo("signal", receivedSignal.Load().(string))
 	// Use Shutdown() instead of StopServer() to ensure proper container cleanup
 	// Shutdown() calls runtime.Close() which triggers ShutdownAll() for Docker cleanup
 	if err := srv.Shutdown(); err != nil {

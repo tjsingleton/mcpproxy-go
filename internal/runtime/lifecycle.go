@@ -8,10 +8,10 @@ import (
 
 	"go.uber.org/zap"
 
-	"mcpproxy-go/internal/config"
-	"mcpproxy-go/internal/oauth"
-	"mcpproxy-go/internal/runtime/configsvc"
-	"mcpproxy-go/internal/runtime/supervisor"
+	"github.com/smart-mcp-proxy/mcpproxy-go/internal/config"
+	"github.com/smart-mcp-proxy/mcpproxy-go/internal/oauth"
+	"github.com/smart-mcp-proxy/mcpproxy-go/internal/runtime/configsvc"
+	"github.com/smart-mcp-proxy/mcpproxy-go/internal/runtime/supervisor"
 )
 
 const connectAttemptTimeout = 45 * time.Second
@@ -894,6 +894,13 @@ func (r *Runtime) EnableServer(serverName string, enabled bool) error {
 		"server":  serverName,
 		"enabled": enabled,
 	})
+
+	// Emit config change activity for audit trail (Spec 024)
+	action := "server_disabled"
+	if enabled {
+		action = "server_enabled"
+	}
+	r.EmitActivityConfigChange(action, serverName, "api", []string{"enabled"}, map[string]interface{}{"enabled": !enabled}, map[string]interface{}{"enabled": enabled})
 
 	r.HandleUpstreamServerChange(r.AppContext())
 
