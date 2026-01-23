@@ -1,0 +1,1320 @@
+definitions:
+  contracts.Diagnostics:
+    properties:
+      docker_status:
+        $ref: '#/definitions/contracts.DockerStatus'
+      missing_secrets:
+        description: Renamed to avoid conflict
+        items:
+          $ref: '#/definitions/contracts.MissingSecretInfo'
+        type: array
+      oauth_issues:
+        description: OAuth parameter mismatches
+        items:
+          $ref: '#/definitions/contracts.OAuthIssue'
+        type: array
+      oauth_required:
+        items:
+          $ref: '#/definitions/contracts.OAuthRequirement'
+        type: array
+      runtime_warnings:
+        items:
+          type: string
+        type: array
+      timestamp:
+        type: string
+      total_issues:
+        type: integer
+      upstream_errors:
+        items:
+          $ref: '#/definitions/contracts.UpstreamError'
+        type: array
+    type: object
+  contracts.DockerStatus:
+    properties:
+      available:
+        type: boolean
+      error:
+        type: string
+      version:
+        type: string
+    type: object
+  contracts.ErrorResponse:
+    properties:
+      error:
+        type: string
+      success:
+        type: boolean
+    type: object
+  contracts.GetServerLogsResponse:
+    properties:
+      count:
+        type: integer
+      logs:
+        items:
+          $ref: '#/definitions/contracts.LogEntry'
+        type: array
+      server_name:
+        type: string
+    type: object
+  contracts.GetServerToolsResponse:
+    properties:
+      count:
+        type: integer
+      server_name:
+        type: string
+      tools:
+        items:
+          $ref: '#/definitions/contracts.Tool'
+        type: array
+    type: object
+  contracts.GetServersResponse:
+    properties:
+      servers:
+        items:
+          $ref: '#/definitions/contracts.Server'
+        type: array
+      stats:
+        $ref: '#/definitions/contracts.ServerStats'
+    type: object
+  contracts.IsolationConfig:
+    properties:
+      cpu_limit:
+        type: string
+      enabled:
+        type: boolean
+      image:
+        type: string
+      memory_limit:
+        type: string
+      timeout:
+        type: string
+      working_dir:
+        type: string
+    type: object
+  contracts.LogEntry:
+    properties:
+      fields:
+        additionalProperties: true
+        type: object
+      level:
+        type: string
+      message:
+        type: string
+      server:
+        type: string
+      timestamp:
+        type: string
+    type: object
+  contracts.MissingSecretInfo:
+    properties:
+      secret_name:
+        type: string
+      used_by:
+        items:
+          type: string
+        type: array
+    type: object
+  contracts.OAuthConfig:
+    properties:
+      auth_url:
+        type: string
+      client_id:
+        type: string
+      extra_params:
+        additionalProperties:
+          type: string
+        type: object
+      pkce_enabled:
+        type: boolean
+      redirect_port:
+        type: integer
+      scopes:
+        items:
+          type: string
+        type: array
+      token_expires_at:
+        description: When the OAuth token expires
+        type: string
+      token_url:
+        type: string
+      token_valid:
+        description: Whether token is currently valid
+        type: boolean
+    type: object
+  contracts.OAuthIssue:
+    properties:
+      documentation_url:
+        type: string
+      error:
+        type: string
+      issue:
+        type: string
+      missing_params:
+        items:
+          type: string
+        type: array
+      resolution:
+        type: string
+      server_name:
+        type: string
+    type: object
+  contracts.OAuthRequirement:
+    properties:
+      expires_at:
+        type: string
+      message:
+        type: string
+      server_name:
+        type: string
+      state:
+        type: string
+    type: object
+  contracts.SearchResult:
+    properties:
+      matches:
+        type: integer
+      score:
+        type: number
+      snippet:
+        type: string
+      tool:
+        $ref: '#/definitions/contracts.Tool'
+    type: object
+  contracts.SearchToolsResponse:
+    properties:
+      query:
+        type: string
+      results:
+        items:
+          $ref: '#/definitions/contracts.SearchResult'
+        type: array
+      took:
+        type: string
+      total:
+        type: integer
+    type: object
+  contracts.Server:
+    properties:
+      args:
+        items:
+          type: string
+        type: array
+      authenticated:
+        description: OAuth authentication status
+        type: boolean
+      command:
+        type: string
+      connected:
+        type: boolean
+      connected_at:
+        type: string
+      connecting:
+        type: boolean
+      created:
+        type: string
+      enabled:
+        type: boolean
+      env:
+        additionalProperties:
+          type: string
+        type: object
+      headers:
+        additionalProperties:
+          type: string
+        type: object
+      id:
+        type: string
+      isolation:
+        $ref: '#/definitions/contracts.IsolationConfig'
+      last_error:
+        type: string
+      last_reconnect_at:
+        type: string
+      last_retry_time:
+        type: string
+      name:
+        type: string
+      oauth:
+        $ref: '#/definitions/contracts.OAuthConfig'
+      oauth_status:
+        description: 'OAuth status: "authenticated", "expired", "error", "none"'
+        type: string
+      protocol:
+        type: string
+      quarantined:
+        type: boolean
+      reconnect_count:
+        type: integer
+      retry_count:
+        type: integer
+      should_retry:
+        type: boolean
+      status:
+        type: string
+      token_expires_at:
+        description: When the OAuth token expires (ISO 8601)
+        type: string
+      tool_count:
+        type: integer
+      tool_list_token_size:
+        description: Token size for this server's tools
+        type: integer
+      updated:
+        type: string
+      url:
+        type: string
+      user_logged_out:
+        description: True if user explicitly logged out (prevents auto-reconnection)
+        type: boolean
+      working_dir:
+        type: string
+    type: object
+  contracts.ServerActionResponse:
+    properties:
+      action:
+        type: string
+      async:
+        type: boolean
+      server:
+        type: string
+      success:
+        type: boolean
+    type: object
+  contracts.ServerStats:
+    properties:
+      connected_servers:
+        type: integer
+      docker_containers:
+        type: integer
+      quarantined_servers:
+        type: integer
+      token_metrics:
+        $ref: '#/definitions/contracts.ServerTokenMetrics'
+      total_servers:
+        type: integer
+      total_tools:
+        type: integer
+    type: object
+  contracts.ServerTokenMetrics:
+    properties:
+      average_query_result_size:
+        description: Typical retrieve_tools output (tokens)
+        type: integer
+      per_server_tool_list_sizes:
+        additionalProperties:
+          type: integer
+        description: Token size per server
+        type: object
+      saved_tokens:
+        description: Difference
+        type: integer
+      saved_tokens_percentage:
+        description: Percentage saved
+        type: number
+      total_server_tool_list_size:
+        description: All upstream tools combined (tokens)
+        type: integer
+    type: object
+  contracts.SuccessResponse:
+    properties:
+      data: {}
+      success:
+        type: boolean
+    type: object
+  contracts.Tool:
+    properties:
+      annotations:
+        $ref: '#/definitions/contracts.ToolAnnotation'
+      description:
+        type: string
+      last_used:
+        type: string
+      name:
+        type: string
+      schema:
+        additionalProperties: true
+        type: object
+      server_name:
+        type: string
+      usage:
+        type: integer
+    type: object
+  contracts.ToolAnnotation:
+    properties:
+      destructiveHint:
+        type: boolean
+      idempotentHint:
+        type: boolean
+      openWorldHint:
+        type: boolean
+      readOnlyHint:
+        type: boolean
+      title:
+        type: string
+    type: object
+  contracts.UpstreamError:
+    properties:
+      error_message:
+        type: string
+      server_name:
+        type: string
+      timestamp:
+        type: string
+    type: object
+  main.Diagnostics:
+    properties:
+      docker_status:
+        $ref: '#/definitions/main.DockerStatus'
+      missing_secrets:
+        items:
+          $ref: '#/definitions/main.MissingSecret'
+        type: array
+      oauth_required:
+        items:
+          $ref: '#/definitions/main.OAuthRequirement'
+        type: array
+      runtime_warnings:
+        items:
+          type: string
+        type: array
+      timestamp:
+        example: "2025-11-23T10:35:12Z"
+        type: string
+      total_issues:
+        example: 3
+        type: integer
+      upstream_errors:
+        items:
+          $ref: '#/definitions/main.UpstreamError'
+        type: array
+    type: object
+  main.DockerStatus:
+    properties:
+      available:
+        example: true
+        type: boolean
+      error:
+        example: ""
+        type: string
+      version:
+        example: 24.0.7
+        type: string
+    type: object
+  main.ErrorResponse:
+    properties:
+      code:
+        example: MGMT_DISABLED
+        type: string
+      details:
+        example: Set disable_management=false in config
+        type: string
+      error:
+        example: management operations disabled
+        type: string
+    type: object
+  main.LogEntry:
+    properties:
+      level:
+        example: INFO
+        type: string
+      message:
+        example: 'Tool call: create_issue'
+        type: string
+      server:
+        example: github-server
+        type: string
+      timestamp:
+        example: "2025-11-23T10:30:00Z"
+        type: string
+    type: object
+  main.MissingSecret:
+    properties:
+      secret_name:
+        example: GITHUB_TOKEN
+        type: string
+      used_by:
+        example:
+        - '["github-server"'
+        - '"gh-issues"]'
+        items:
+          type: string
+        type: array
+    type: object
+  main.OAuthRequirement:
+    properties:
+      expires_at:
+        example: "2025-11-22T18:00:00Z"
+        type: string
+      message:
+        example: 'Run: mcpproxy auth login --server=github-server'
+        type: string
+      server_name:
+        example: github-server
+        type: string
+      state:
+        example: expired
+        type: string
+    type: object
+  main.RestartAllResponse:
+    properties:
+      errors:
+        example:
+        - '["server-1: connection timeout"]'
+        items:
+          type: string
+        type: array
+      failed_count:
+        example: 1
+        type: integer
+      success_count:
+        example: 9
+        type: integer
+    type: object
+  main.Server:
+    properties:
+      connected:
+        example: true
+        type: boolean
+      enabled:
+        example: true
+        type: boolean
+      error:
+        example: ""
+        type: string
+      name:
+        example: github-server
+        type: string
+      quarantined:
+        example: false
+        type: boolean
+      tool_count:
+        example: 25
+        type: integer
+    type: object
+  main.ServerStats:
+    properties:
+      connected:
+        example: 7
+        type: integer
+      disabled:
+        example: 2
+        type: integer
+      enabled:
+        example: 8
+        type: integer
+      errors:
+        example: 1
+        type: integer
+      quarantined:
+        example: 1
+        type: integer
+      total:
+        example: 10
+        type: integer
+    type: object
+  main.ServersResponse:
+    properties:
+      servers:
+        items:
+          $ref: '#/definitions/main.Server'
+        type: array
+      stats:
+        $ref: '#/definitions/main.ServerStats'
+    type: object
+  main.UpstreamError:
+    properties:
+      error_message:
+        example: connection refused
+        type: string
+      server_name:
+        example: weather-api
+        type: string
+      timestamp:
+        example: "2025-11-23T09:15:30Z"
+        type: string
+    type: object
+  management.BulkOperationResult:
+    properties:
+      errors:
+        additionalProperties:
+          type: string
+        description: Map of server name to error message
+        type: object
+      failed:
+        description: Number of failed operations
+        type: integer
+      successful:
+        description: Number of successful operations
+        type: integer
+      total:
+        description: Total servers processed
+        type: integer
+    type: object
+info:
+  contact:
+    name: MCPProxy Support
+    url: https://github.com/smart-mcp-proxy/mcpproxy-go
+  description: |-
+    MCPProxy REST API for managing MCP servers, tools, and diagnostics
+
+    MCPProxy is a smart proxy for AI agents using the Model Context Protocol (MCP).
+    It provides intelligent tool discovery, massive token savings, and built-in security quarantine.
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  title: MCPProxy API
+  version: "1.0"
+paths:
+  /diagnostics:
+    get:
+      description: Get comprehensive health diagnostics including upstream errors,
+        OAuth requirements, missing secrets, and Docker status
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Health diagnostics
+          schema:
+            $ref: '#/definitions/contracts.Diagnostics'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/contracts.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      - ApiKeyQuery: []
+      summary: Get health diagnostics
+      tags:
+      - diagnostics
+  /docker/status:
+    get:
+      description: Retrieve current Docker availability and recovery status
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Docker status information
+          schema:
+            $ref: '#/definitions/contracts.SuccessResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/contracts.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      - ApiKeyQuery: []
+      summary: Get Docker status
+      tags:
+      - docker
+  /doctor:
+    get:
+      consumes:
+      - application/json
+      description: Aggregates health information from all servers, checks OAuth status,
+        missing secrets, and Docker availability
+      parameters:
+      - description: API Key
+        in: query
+        name: apikey
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Comprehensive health diagnostics
+          schema:
+            $ref: '#/definitions/main.Diagnostics'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+        ApiKeyQuery: []
+      summary: Run health diagnostics
+      tags:
+      - diagnostics
+  /index/search:
+    get:
+      description: Search across all upstream MCP server tools using BM25 keyword
+        search
+      parameters:
+      - description: Search query
+        in: query
+        name: q
+        required: true
+        type: string
+      - default: 10
+        description: Maximum number of results
+        in: query
+        maximum: 100
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Search results
+          schema:
+            $ref: '#/definitions/contracts.SearchToolsResponse'
+        "400":
+          description: Bad request (missing query parameter)
+          schema:
+            $ref: '#/definitions/contracts.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/contracts.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      - ApiKeyQuery: []
+      summary: Search for tools
+      tags:
+      - tools
+  /info:
+    get:
+      description: |-
+        Get essential server metadata including version, web UI URL, and endpoint addresses
+        This endpoint is designed for tray-core communication
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Server information
+          schema:
+            $ref: '#/definitions/contracts.SuccessResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/contracts.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      - ApiKeyQuery: []
+      summary: Get server information
+      tags:
+      - status
+  /servers:
+    get:
+      consumes:
+      - application/json
+      description: Returns all configured MCP servers with connection status, tool
+        counts, and aggregate statistics
+      parameters:
+      - description: API Key (alternative to header for browser/SSE)
+        in: query
+        name: apikey
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of servers with statistics
+          schema:
+            $ref: '#/definitions/main.ServersResponse'
+        "401":
+          description: Unauthorized - missing or invalid API key
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+        ApiKeyQuery: []
+      summary: List all upstream servers
+      tags:
+      - servers
+  /servers/{id}/disable:
+    post:
+      description: Disable a specific upstream MCP server
+      parameters:
+      - description: Server ID or name
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Server disabled successfully
+          schema:
+            $ref: '#/definitions/contracts.ServerActionResponse'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/contracts.ErrorResponse'
+        "404":
+          description: Server not found
+          schema:
+            $ref: '#/definitions/contracts.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/contracts.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      - ApiKeyQuery: []
+      summary: Disable an upstream server
+      tags:
+      - servers
+  /servers/{id}/enable:
+    post:
+      description: Enable a specific upstream MCP server
+      parameters:
+      - description: Server ID or name
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Server enabled successfully
+          schema:
+            $ref: '#/definitions/contracts.ServerActionResponse'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/contracts.ErrorResponse'
+        "404":
+          description: Server not found
+          schema:
+            $ref: '#/definitions/contracts.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/contracts.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      - ApiKeyQuery: []
+      summary: Enable an upstream server
+      tags:
+      - servers
+  /servers/{id}/login:
+    post:
+      description: Initiate OAuth authentication flow for a specific upstream MCP
+        server. Use force=true to force re-authentication even if tokens exist.
+      parameters:
+      - description: Server ID or name
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: 'Force OAuth flow even if tokens exist (default: false)'
+        in: query
+        name: force
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OAuth login initiated successfully
+          schema:
+            $ref: '#/definitions/contracts.ServerActionResponse'
+        "400":
+          description: Bad request (missing server ID)
+          schema:
+            $ref: '#/definitions/contracts.ErrorResponse'
+        "404":
+          description: Server not found
+          schema:
+            $ref: '#/definitions/contracts.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/contracts.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      - ApiKeyQuery: []
+      summary: Trigger OAuth login for server
+      tags:
+      - servers
+  /servers/{id}/logs:
+    get:
+      description: Retrieve log entries for a specific upstream MCP server
+      parameters:
+      - description: Server ID or name
+        in: path
+        name: id
+        required: true
+        type: string
+      - default: 100
+        description: Number of log lines to retrieve
+        in: query
+        name: tail
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Server logs retrieved successfully
+          schema:
+            $ref: '#/definitions/contracts.GetServerLogsResponse'
+        "400":
+          description: Bad request (missing server ID)
+          schema:
+            $ref: '#/definitions/contracts.ErrorResponse'
+        "404":
+          description: Server not found
+          schema:
+            $ref: '#/definitions/contracts.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/contracts.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      - ApiKeyQuery: []
+      summary: Get server logs
+      tags:
+      - servers
+  /servers/{id}/quarantine:
+    post:
+      description: Place a specific upstream MCP server in quarantine to prevent tool
+        execution
+      parameters:
+      - description: Server ID or name
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Server quarantined successfully
+          schema:
+            $ref: '#/definitions/contracts.ServerActionResponse'
+        "400":
+          description: Bad request (missing server ID)
+          schema:
+            $ref: '#/definitions/contracts.ErrorResponse'
+        "404":
+          description: Server not found
+          schema:
+            $ref: '#/definitions/contracts.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/contracts.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      - ApiKeyQuery: []
+      summary: Quarantine a server
+      tags:
+      - servers
+  /servers/{id}/restart:
+    post:
+      description: Restart the connection to a specific upstream MCP server
+      parameters:
+      - description: Server ID or name
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Server restarted successfully
+          schema:
+            $ref: '#/definitions/contracts.ServerActionResponse'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/contracts.ErrorResponse'
+        "404":
+          description: Server not found
+          schema:
+            $ref: '#/definitions/contracts.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/contracts.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      - ApiKeyQuery: []
+      summary: Restart an upstream server
+      tags:
+      - servers
+  /servers/{id}/tools:
+    get:
+      description: Retrieve all available tools for a specific upstream MCP server
+      parameters:
+      - description: Server ID or name
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Server tools retrieved successfully
+          schema:
+            $ref: '#/definitions/contracts.GetServerToolsResponse'
+        "400":
+          description: Bad request (missing server ID)
+          schema:
+            $ref: '#/definitions/contracts.ErrorResponse'
+        "404":
+          description: Server not found
+          schema:
+            $ref: '#/definitions/contracts.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/contracts.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      - ApiKeyQuery: []
+      summary: Get tools for a server
+      tags:
+      - servers
+  /servers/{id}/unquarantine:
+    post:
+      description: Remove a specific upstream MCP server from quarantine to allow
+        tool execution
+      parameters:
+      - description: Server ID or name
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Server unquarantined successfully
+          schema:
+            $ref: '#/definitions/contracts.ServerActionResponse'
+        "400":
+          description: Bad request (missing server ID)
+          schema:
+            $ref: '#/definitions/contracts.ErrorResponse'
+        "404":
+          description: Server not found
+          schema:
+            $ref: '#/definitions/contracts.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/contracts.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      - ApiKeyQuery: []
+      summary: Unquarantine a server
+      tags:
+      - servers
+  /servers/{name}/logs:
+    get:
+      consumes:
+      - application/json
+      description: Returns recent log entries for a specific upstream server
+      parameters:
+      - description: Server name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Number of lines to return (default 50, max 1000)
+        in: query
+        name: tail
+        type: integer
+      - description: API Key
+        in: query
+        name: apikey
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Log entries
+          schema:
+            items:
+              $ref: '#/definitions/main.LogEntry'
+            type: array
+        "400":
+          description: Bad request - invalid tail parameter
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Server not found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+        ApiKeyQuery: []
+      summary: Get server logs
+      tags:
+      - servers
+  /servers/{name}/restart:
+    post:
+      consumes:
+      - application/json
+      description: Stops and restarts the connection to a specific upstream MCP server.
+        Emits servers.changed event.
+      parameters:
+      - description: Server name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: API Key (alternative to header)
+        in: query
+        name: apikey
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success message
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad request - invalid server name
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "403":
+          description: Forbidden - read-only mode or management disabled
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Server not found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+        ApiKeyQuery: []
+      summary: Restart an upstream server
+      tags:
+      - servers
+  /servers/disable_all:
+    post:
+      description: Disable all configured upstream MCP servers with partial failure
+        handling
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Bulk disable results with success/failure counts
+          schema:
+            $ref: '#/definitions/management.BulkOperationResult'
+        "403":
+          description: Forbidden (management disabled)
+          schema:
+            $ref: '#/definitions/contracts.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/contracts.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      - ApiKeyQuery: []
+      summary: Disable all servers
+      tags:
+      - servers
+  /servers/enable_all:
+    post:
+      description: Enable all configured upstream MCP servers with partial failure
+        handling
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Bulk enable results with success/failure counts
+          schema:
+            $ref: '#/definitions/management.BulkOperationResult'
+        "403":
+          description: Forbidden (management disabled)
+          schema:
+            $ref: '#/definitions/contracts.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/contracts.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      - ApiKeyQuery: []
+      summary: Enable all servers
+      tags:
+      - servers
+  /servers/reconnect:
+    post:
+      description: Force reconnection to all upstream MCP servers
+      parameters:
+      - description: Reason for reconnection
+        in: query
+        name: reason
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: All servers reconnected successfully
+          schema:
+            $ref: '#/definitions/contracts.ServerActionResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/contracts.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      - ApiKeyQuery: []
+      summary: Reconnect all servers
+      tags:
+      - servers
+  /servers/restart_all:
+    post:
+      consumes:
+      - application/json
+      description: Sequentially restarts all configured servers. Returns partial success
+        if some servers fail.
+      parameters:
+      - description: API Key
+        in: query
+        name: apikey
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Restart results with success/failure counts
+          schema:
+            $ref: '#/definitions/main.RestartAllResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "403":
+          description: Forbidden - read-only mode
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+        ApiKeyQuery: []
+      summary: Restart all upstream servers
+      tags:
+      - servers
+  /stats/tokens:
+    get:
+      description: Retrieve token savings statistics across all servers and sessions
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Token statistics
+          schema:
+            $ref: '#/definitions/contracts.SuccessResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/contracts.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      - ApiKeyQuery: []
+      summary: Get token savings statistics
+      tags:
+      - stats
+  /status:
+    get:
+      description: Get comprehensive server status including running state, listen
+        address, upstream statistics, and timestamp
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Server status information
+          schema:
+            $ref: '#/definitions/contracts.SuccessResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/contracts.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      - ApiKeyQuery: []
+      summary: Get server status
+      tags:
+      - status
+  /tools/call:
+    post:
+      consumes:
+      - application/json
+      description: Execute a tool on an upstream MCP server (wrapper around MCP tool
+        calls)
+      parameters:
+      - description: Tool call request with tool name and arguments
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            arguments:
+              type: object
+            tool_name:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Tool call result
+          schema:
+            $ref: '#/definitions/contracts.SuccessResponse'
+        "400":
+          description: Bad request (invalid payload or missing tool name)
+          schema:
+            $ref: '#/definitions/contracts.ErrorResponse'
+        "500":
+          description: Internal server error or tool execution failure
+          schema:
+            $ref: '#/definitions/contracts.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      - ApiKeyQuery: []
+      summary: Call a tool
+      tags:
+      - tools
+securityDefinitions:
+  ApiKeyAuth:
+    description: API key authentication. Provide your API key in the X-API-Key header.
+    in: header
+    name: X-API-Key
+    type: apiKey
+  ApiKeyQuery:
+    description: API key authentication via query parameter. Use ?apikey=your-key
+    in: query
+    name: apikey
+    type: apiKey
+swagger: "2.0"

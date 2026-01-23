@@ -615,7 +615,20 @@ func ValidateOAuthMetadata(serverURL, serverName string, timeout time.Duration) 
 	// Step 4: Extract authorization server URL and fetch its metadata
 	var authServerBaseURL string
 	if protectedMetadata != nil && len(protectedMetadata.AuthorizationServers) > 0 {
-		authServerBaseURL = protectedMetadata.AuthorizationServers[0]
+		// The authorization_servers from protected resource metadata may contain a path
+		// (e.g., "https://example.com/oauth"), but RFC 8414 metadata is always at the base URL.
+		// Extract just the scheme+host to construct the correct well-known URL.
+		authServerURL := protectedMetadata.AuthorizationServers[0]
+		parsedBase, err := parseBaseURL(authServerURL)
+		if err != nil {
+			logger.Debug("Failed to parse authorization server URL from protected resource metadata",
+				zap.String("server", serverName),
+				zap.String("auth_server_url", authServerURL),
+				zap.Error(err))
+			authServerBaseURL = authServerURL // Fall back to using as-is
+		} else {
+			authServerBaseURL = parsedBase
+		}
 	} else {
 		// Fallback to base URL of server
 		baseURL, err := parseBaseURL(serverURL)

@@ -1110,6 +1110,12 @@ func (m *SynchronizationManager) performSync() error {
 		if strings.Contains(err.Error(), "database not available") {
 			m.logger.Debug("Database not available, skipping servers menu update to preserve UI state")
 			// Don't update servers menu to preserve current state
+		} else if strings.Contains(err.Error(), "context deadline exceeded") || strings.Contains(err.Error(), "timeout") {
+			// Connection timeout - core server may be down or unreachable
+			// Log at debug level to reduce noise when core is intentionally stopped
+			m.logger.Debug("Core server unreachable during sync, skipping update",
+				zap.Error(err))
+			return nil // Don't propagate timeout errors as failures
 		} else {
 			m.logger.Error("Failed to get all servers", zap.Error(err))
 			return fmt.Errorf("failed to get all servers: %w", err)
@@ -1135,6 +1141,11 @@ func (m *SynchronizationManager) performSync() error {
 		if strings.Contains(err.Error(), "database not available") {
 			m.logger.Debug("Database not available, skipping quarantine menu update to preserve UI state")
 			// Don't update quarantine menu to preserve current state
+		} else if strings.Contains(err.Error(), "context deadline exceeded") || strings.Contains(err.Error(), "timeout") {
+			// Connection timeout - core server may be down or unreachable
+			m.logger.Debug("Core server unreachable during sync, skipping quarantine update",
+				zap.Error(err))
+			return nil // Don't propagate timeout errors as failures
 		} else {
 			m.logger.Error("Failed to get quarantined servers", zap.Error(err))
 			return fmt.Errorf("failed to get quarantined servers: %w", err)
@@ -1267,4 +1278,3 @@ func extractHealthLevel(server map[string]interface{}) string {
 
 	return ""
 }
-

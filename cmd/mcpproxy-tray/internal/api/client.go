@@ -457,8 +457,14 @@ func (c *Client) GetReady(ctx context.Context) error {
 func (c *Client) GetServers() ([]Server, error) {
 	resp, err := c.makeRequest("GET", "/api/v1/servers", nil)
 	if err != nil {
+		// Log timeout/connection errors at debug level to reduce noise when core is down
 		if c.logger != nil {
-			c.logger.Warnw("Failed to fetch upstream servers", "error", err)
+			errStr := err.Error()
+			if strings.Contains(errStr, "context deadline exceeded") || strings.Contains(errStr, "timeout") || strings.Contains(errStr, "connection refused") {
+				c.logger.Debugw("Core server unreachable", "error", err)
+			} else {
+				c.logger.Warnw("Failed to fetch upstream servers", "error", err)
+			}
 		}
 		return nil, err
 	}
