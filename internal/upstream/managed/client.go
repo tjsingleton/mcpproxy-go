@@ -726,6 +726,16 @@ func (mc *Client) ForceReconnect(reason string) {
 	go mc.tryReconnect()
 }
 
+// RefreshOAuthTokenDirect forces an OAuth token refresh without reconnecting.
+// This delegates to the core client's direct refresh implementation.
+// Used by the RefreshManager for proactive token refresh before expiration.
+func (mc *Client) RefreshOAuthTokenDirect(ctx context.Context) error {
+	if mc == nil || mc.coreClient == nil {
+		return fmt.Errorf("client not initialized")
+	}
+	return mc.coreClient.RefreshOAuthTokenDirect(ctx)
+}
+
 // tryReconnect attempts to reconnect the client with proper error handling
 func (mc *Client) tryReconnect() {
 	if mc.IsUserLoggedOut() {
