@@ -2914,20 +2914,33 @@ func (c *Client) markOAuthComplete() {
 // to persistent storage. This enables proactive token refresh to use stored credentials
 // when the handler's config is not populated (common with DCR flows).
 func (c *Client) persistDCRCredentials() {
+	c.logger.Debug("persistDCRCredentials: entering",
+		zap.String("server", c.config.Name),
+		zap.Bool("has_storage", c.storage != nil))
+
 	if c.storage == nil {
+		c.logger.Debug("persistDCRCredentials: no storage, skipping",
+			zap.String("server", c.config.Name))
 		return
 	}
 
 	handler := c.GetOAuthHandler()
 	if handler == nil {
+		c.logger.Debug("persistDCRCredentials: no OAuth handler, skipping",
+			zap.String("server", c.config.Name))
 		return
 	}
 
 	clientID := handler.GetClientID()
 	clientSecret := handler.GetClientSecret()
 
+	c.logger.Debug("persistDCRCredentials: got credentials from handler",
+		zap.String("server", c.config.Name),
+		zap.Bool("has_client_id", clientID != ""),
+		zap.Bool("has_client_secret", clientSecret != ""))
+
 	if clientID == "" {
-		c.logger.Debug("No ClientID in OAuth handler to persist",
+		c.logger.Debug("persistDCRCredentials: ClientID is empty, skipping",
 			zap.String("server", c.config.Name))
 		return
 	}

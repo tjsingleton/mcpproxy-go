@@ -540,6 +540,8 @@ func (c *Client) GetOAuthHandler() *transport.OAuthHandler {
 	c.mu.RUnlock()
 
 	if mcpClient == nil {
+		c.logger.Debug("GetOAuthHandler: c.client is nil",
+			zap.String("server", c.config.Name))
 		return nil
 	}
 
@@ -550,9 +552,31 @@ func (c *Client) GetOAuthHandler() *transport.OAuthHandler {
 	}
 
 	t := mcpClient.GetTransport()
-	if ot, ok := t.(oauthTransport); ok {
-		return ot.GetOAuthHandler()
+	if t == nil {
+		c.logger.Debug("GetOAuthHandler: transport is nil",
+			zap.String("server", c.config.Name))
+		return nil
 	}
+
+	transportType := fmt.Sprintf("%T", t)
+	if ot, ok := t.(oauthTransport); ok {
+		handler := ot.GetOAuthHandler()
+		if handler == nil {
+			c.logger.Debug("GetOAuthHandler: handler is nil from transport",
+				zap.String("server", c.config.Name),
+				zap.String("transport_type", transportType))
+		} else {
+			c.logger.Debug("GetOAuthHandler: successfully retrieved handler",
+				zap.String("server", c.config.Name),
+				zap.String("transport_type", transportType),
+				zap.Bool("has_client_id", handler.GetClientID() != ""))
+		}
+		return handler
+	}
+
+	c.logger.Debug("GetOAuthHandler: transport does not implement oauthTransport interface",
+		zap.String("server", c.config.Name),
+		zap.String("transport_type", transportType))
 	return nil
 }
 
