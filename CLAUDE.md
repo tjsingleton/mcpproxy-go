@@ -51,29 +51,23 @@ go test -race ./internal/... -v     # Race detection
 ./mcpproxy-tray                     # Start tray (auto-starts core)
 ```
 
-### Development Daemon Management
+### Development Daemon (`scripts/dev-mcpproxy.sh`)
 
-For development, use `scripts/dev-mcpproxy.sh` to manage the mcpproxy-tray daemon with proper process lifecycle, logging, and worktree support:
+Manages mcpproxy-tray with worktree support. Runs `make build` before starting.
 
 ```bash
-./scripts/dev-mcpproxy.sh           # Build and start from current directory
-./scripts/dev-mcpproxy.sh main      # Build and start from .worktrees/main
-./scripts/dev-mcpproxy.sh stop      # Stop running daemon
-./scripts/dev-mcpproxy.sh status    # Show daemon status (PID, branch, commit)
-./scripts/dev-mcpproxy.sh logs      # Follow daemon log
+./scripts/dev-mcpproxy.sh           # Build and start from current dir
+./scripts/dev-mcpproxy.sh main      # Build from .worktrees/main
+./scripts/dev-mcpproxy.sh stop      # Stop daemon
+./scripts/dev-mcpproxy.sh status    # PID, binary path, branch info
+./scripts/dev-mcpproxy.sh logs      # Tail ~/.mcpproxy/daemon.log
+./scripts/dev-mcpproxy.sh doctor    # Diagnostic checks (see below)
+./scripts/dev-mcpproxy.sh --skip-build  # Start without rebuilding
 ```
 
-**Key Features**:
-- Automatic cleanup of orphaned processes before starting
-- PID file management (`~/.mcpproxy/mcpproxy-tray.pid`)
-- Branch/worktree switching (useful for testing feature branches)
-- Unified daemon log (`~/.mcpproxy/daemon.log`)
+**Doctor checks:** Binary exists, process running, branch matches worktree, socket available, API responding, upstream server errors (HTML stripped), OAuth token status with expiry times.
 
-**Important**: This script runs `make build` before starting. If npm is unavailable, build Go binaries directly:
-```bash
-go build -o mcpproxy ./cmd/mcpproxy && go build -o mcpproxy-tray ./cmd/mcpproxy-tray
-./scripts/dev-mcpproxy.sh
-```
+**Internals:** `api_call()` uses Unix socket (no auth needed). PID: `~/.mcpproxy/mcpproxy-tray.pid`. Exit codes: 0=pass, 1=failures, 2=warnings.
 
 ### CLI Management
 ```bash
