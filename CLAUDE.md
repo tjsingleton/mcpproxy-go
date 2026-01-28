@@ -51,6 +51,30 @@ go test -race ./internal/... -v     # Race detection
 ./mcpproxy-tray                     # Start tray (auto-starts core)
 ```
 
+### Development Daemon Management
+
+For development, use `scripts/dev-mcpproxy.sh` to manage the mcpproxy-tray daemon with proper process lifecycle, logging, and worktree support:
+
+```bash
+./scripts/dev-mcpproxy.sh           # Build and start from current directory
+./scripts/dev-mcpproxy.sh main      # Build and start from .worktrees/main
+./scripts/dev-mcpproxy.sh stop      # Stop running daemon
+./scripts/dev-mcpproxy.sh status    # Show daemon status (PID, branch, commit)
+./scripts/dev-mcpproxy.sh logs      # Follow daemon log
+```
+
+**Key Features**:
+- Automatic cleanup of orphaned processes before starting
+- PID file management (`~/.mcpproxy/mcpproxy-tray.pid`)
+- Branch/worktree switching (useful for testing feature branches)
+- Unified daemon log (`~/.mcpproxy/daemon.log`)
+
+**Important**: This script runs `make build` before starting. If npm is unavailable, build Go binaries directly:
+```bash
+go build -o mcpproxy ./cmd/mcpproxy && go build -o mcpproxy-tray ./cmd/mcpproxy-tray
+./scripts/dev-mcpproxy.sh
+```
+
 ### CLI Management
 ```bash
 mcpproxy upstream list              # List all servers
