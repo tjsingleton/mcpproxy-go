@@ -1303,6 +1303,10 @@ func (c *Client) tryOAuthAuth(ctx context.Context) error {
 				zap.String("server", c.config.Name),
 				zap.Bool("had_refresh_token", hasRefreshToken))
 
+			// Clear OAuth state before calling handleOAuthAuthorization which manages its own state
+			// This prevents "OAuth authorization already in progress" error
+			c.clearOAuthState()
+
 			// Handle OAuth authorization manually using the example pattern
 			if handleErr := c.handleOAuthAuthorization(ctx, lastErr, oauthConfig, extraParams); handleErr != nil {
 				c.clearOAuthState() // Clear state on OAuth failure
@@ -1782,6 +1786,10 @@ func (c *Client) trySSEOAuthAuth(ctx context.Context) error {
 			c.logger.Info("🎯 SSE OAuth authorization required after connection attempts - starting manual OAuth flow",
 				zap.String("server", c.config.Name),
 				zap.Bool("had_refresh_token", hasRefreshToken))
+
+			// Clear OAuth state before calling handleOAuthAuthorization which manages its own state
+			// This prevents "OAuth authorization already in progress" error
+			c.clearOAuthState()
 
 			// Handle OAuth authorization manually using the example pattern
 			if handleErr := c.handleOAuthAuthorization(ctx, lastErr, oauthConfig, extraParams); handleErr != nil {
