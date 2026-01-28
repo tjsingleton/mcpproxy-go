@@ -17,6 +17,10 @@ MCPPROXY_DATA_DIR="${HOME}/.mcpproxy"
 PID_FILE="${MCPPROXY_DATA_DIR}/mcpproxy-tray.pid"
 LOG_FILE="${MCPPROXY_DATA_DIR}/daemon.log"
 
+# Daemon flags - override with MCPPROXY_FLAGS env var
+MCPPROXY_DEFAULT_FLAGS="--enable-prompts"
+MCPPROXY_FLAGS="${MCPPROXY_FLAGS:-$MCPPROXY_DEFAULT_FLAGS}"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -175,8 +179,10 @@ start_daemon() {
     fi
 
     log "Starting mcpproxy-tray from ${build_dir}..."
+    [[ -n "${MCPPROXY_FLAGS}" ]] && info "Flags: ${MCPPROXY_FLAGS}"
     cd "${build_dir}"
-    nohup "${tray_binary}" --enable-prompts >> "${LOG_FILE}" 2>&1 &
+    # shellcheck disable=SC2086
+    nohup "${tray_binary}" ${MCPPROXY_FLAGS} >> "${LOG_FILE}" 2>&1 &
     local pid=$!
     echo "${pid}" > "${PID_FILE}"
 
@@ -452,6 +458,9 @@ usage() {
     echo "  (none)      Build and start from current directory"
     echo "  main        Build and start from .worktrees/main"
     echo "  <branch>    Build and start from worktree on that branch"
+    echo ""
+    echo "Environment:"
+    echo "  MCPPROXY_FLAGS  Override daemon flags (default: ${MCPPROXY_DEFAULT_FLAGS})"
     echo ""
     echo "Available worktrees:"
     git -C "$REPO_ROOT" worktree list 2>/dev/null || echo "  (none)"
