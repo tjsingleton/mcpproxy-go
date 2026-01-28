@@ -325,8 +325,7 @@ check_upstream() {
     # Show servers in error state (use process substitution to avoid subshell)
     while IFS='|' read -r name err; do
         [[ -z "${name}" ]] && continue
-        # Truncate long error messages and strip HTML
-        err=$(echo "${err}" | tr -d '\n' | sed 's/<[^>]*>//g' | head -c 60)
+        # Truncate long error messages
         if [[ ${#err} -gt 57 ]]; then
             err="${err:0:57}..."
         fi
@@ -334,7 +333,7 @@ check_upstream() {
     done < <(echo "${status}" | jq -r '
         .data.upstream_stats.servers | to_entries[] |
         select(.value.state == "Error") |
-        "\(.key)|\(.value.last_error // "unknown error")"
+        "\(.key)|\(.value.last_error // "unknown error" | gsub("[\\n\\r]"; " ") | gsub("<[^>]*>"; "") | gsub("  +"; " "))"
     ' 2>/dev/null)
 }
 
@@ -349,9 +348,9 @@ check_oauth() {
 
     # Filter to OAuth-enabled servers and check their health
     local oauth_output=$(echo "${servers}" | jq -r '
-        .data[]? |
-        select(.oauth != null or .health.action == "login") |
-        "\(.name)|\(.health.level // "unknown")|\(.health.summary // "")|\(.health.action // "")"
+        .data.servers[]? |
+        select(.oauth != null) |
+        "\(.name)|\(.health.level // "unknown")|\(.health.summary // "")|\(.health.action // "")|\(.oauth.token_expires_at // "")|\(.oauth.token_valid // false)"
     ' 2>/dev/null)
 
     if [[ -z "${oauth_output}" ]]; then
@@ -359,26 +358,51 @@ check_oauth() {
         return
     fi
 
-    echo "${oauth_output}" | while IFS='|' read -r name level summary action; do
+    # Use process substitution to avoid subshell
+    while IFS='|' read -r name level summary action expires_at token_valid; do
+        [[ -z "${name}" ]] && continue
+
+        # Build status message with expiry info
+        local msg="${summary:-unknown}"
+        if [[ -n "${expires_at}" ]] && [[ "${expires_at}" != "null" ]]; then
+            # Calculate time until expiry
+            local expires_epoch=$(date -j -f "%Y-%m-%dT%H:%M:%S" "${expires_at%[-+]*}" "+%s" 2>/dev/null || echo "0")
+            local now_epoch=$(date "+%s")
+            local diff=$((expires_epoch - now_epoch))
+            if [[ ${diff} -gt 0 ]]; then
+                local hours=$((diff / 3600))
+                local mins=$(((diff % 3600) / 60))
+                if [[ ${hours} -gt 0 ]]; then
+                    msg="Token expires in ${hours}h ${mins}m"
+                else
+                    msg="Token expires in ${mins}m"
+                fi
+            fi
+        fi
+
         case "${level}" in
             healthy)
-                check_pass "${name}: ${summary:-OK}"
+                if [[ "${token_valid}" == "true" ]]; then
+                    check_pass "${name}: ${msg}"
+                else
+                    check_info "${name}: ${msg}"
+                fi
                 ;;
             degraded)
-                check_warn "${name}: ${summary}"
+                check_warn "${name}: ${msg}"
                 ;;
             unhealthy)
                 if [[ "${action}" == "login" ]]; then
                     check_fail "${name}: Not logged in"
                 else
-                    check_fail "${name}: ${summary:-Error}"
+                    check_fail "${name}: ${msg}"
                 fi
                 ;;
             *)
-                check_info "${name}: ${summary:-unknown status}"
+                check_info "${name}: ${msg}"
                 ;;
         esac
-    done
+    done <<< "${oauth_output}"
 }
 
 run_doctor() {
