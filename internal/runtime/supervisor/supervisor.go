@@ -559,16 +559,18 @@ func (s *Supervisor) updateStateView(name string, state *ServerState) {
 
 		// Map connection state to string
 		// Use detailed state from ConnectionInfo when available to avoid mislabeling disconnected servers as "connecting"
+		// Fix for mcpproxy-go-us7: When ConnectionInfo is nil and not Connected, default to "disconnected"
+		// not "connecting" - we should only show "connecting" if there's evidence of an active connection attempt.
 		if state.ConnectionInfo != nil {
 			status.State = strings.ToLower(state.ConnectionInfo.State.String())
 		} else if state.Connected {
 			status.State = "connected"
-		} else if state.Enabled && !state.Quarantined {
-			status.State = "connecting"
-		} else if state.Enabled {
-			status.State = "disconnected"
-		} else {
+		} else if !state.Enabled {
 			status.State = "idle"
+		} else {
+			// Enabled server without ConnectionInfo and not Connected = disconnected
+			// Previously this incorrectly defaulted to "connecting" for enabled, non-quarantined servers
+			status.State = "disconnected"
 		}
 
 		// Update connection time if connected

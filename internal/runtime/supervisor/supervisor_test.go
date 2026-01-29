@@ -731,3 +731,47 @@ func TestSupervisor_InspectionExemption_MultipleServers(t *testing.T) {
 		t.Error("Expected server3 to still be exempted")
 	}
 }
+
+// TestSupervisor_StateView_DisconnectedNotConnecting tests that enabled servers
+// without ConnectionInfo are shown as "disconnected", not "connecting".
+// This is bug mcpproxy-go-us7: Glean stuck in 'connecting' despite successful MCP init.
+func TestSupervisor_StateView_DisconnectedNotConnecting(t *testing.T) {
+	cfg := &config.Config{
+		Listen: "127.0.0.1:8080",
+		Servers: []*config.ServerConfig{
+			{Name: "glean-server", Enabled: true, Quarantined: false},
+		},
+	}
+
+	configSvc := configsvc.NewService(cfg, "/tmp/config.json", zap.NewNop())
+	defer configSvc.Close()
+
+	mockUpstream := NewMockUpstreamAdapter()
+	defer mockUpstream.Close()
+
+	supervisor := New(configSvc, mockUpstream, zap.NewNop())
+
+	// Reconcile to populate StateView
+	_ = supervisor.reconcile(configSvc.Current())
+	time.Sleep(50 * time.Millisecond)
+
+	// The mock adapter does NOT set ConnectionInfo (simulating the bug condition).
+	// The server is enabled but not connected, and ConnectionInfo is nil.
+	// Bug: updateStateView() incorrectly defaults to "connecting" in this case.
+	// Fix: Should show "disconnected" when ConnectionInfo is nil and not Connected.
+
+	stateView := supervisor.StateView().Snapshot()
+	status, ok := stateView.Servers["glean-server"]
+	require.True(t, ok, "Expected glean-server in StateView")
+
+	// The server is not connected (Connected = false), ConnectionInfo is nil.
+	// It should NOT show as "connecting" - it should show as "disconnected".
+	if status.State == "connecting" {
+		t.Errorf("Bug mcpproxy-go-us7: Server state is '%s' but should be 'disconnected' when not connected and ConnectionInfo is nil", status.State)
+	}
+
+	// The correct state for an enabled server that isn't connected should be "disconnected"
+	if status.State != "disconnected" {
+		t.Errorf("Expected state 'disconnected' for enabled server without active connection, got '%s'", status.State)
+	}
+}
